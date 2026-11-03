@@ -26,7 +26,7 @@ Computer science student who likes building the whole thing: the webhook that pu
 
 **Songs in, playable guitar and bass tabs out.** · Oct 2026 – now
 
-<a href="https://github.com/etabor3096/Amphion"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/projects/amphion-dark.svg"><img src="./assets/projects/amphion-light.svg" width="100%" alt="Amphion: audio goes through stem separation, note detection, string and fret mapping, and a beat grid, then plays back as a tab with a moving playhead"></picture></a>
+<a href="https://github.com/etabor3096/Amphion"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/projects/amphion-dark.svg"><img src="./assets/projects/amphion-light.svg" width="100%" alt="Amphion app screens: recording a song, the song library, a song with its key, tempo and tuning, and the guitar tab playing in sync with uncertain notes flagged"></picture></a>
 
 Beginners learn guitar by playing songs they love, but plenty of songs have no tabs, and the ones that exist are often wrong. Amphion listens to a recording or an uploaded file, separates the guitar and bass from the mix, detects the notes, puts each one on a string and fret, and locks them to the song's beat grid. The tab scrolls with the audio while you play along. You can slow it down, loop a hard section, or tap a note to jump to it, and notes the model isn't sure about are flagged instead of hidden.
 
@@ -53,7 +53,7 @@ Coding agents start every session knowing only the code. Ember collects the reas
 
 **Junior design. Snap a meal, get a carb estimate, send the insulin dose.** · Spring 2026
 
-<a href="https://github.com/cbu-jr-design-26/snap-dose"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/projects/snapdose-dark.svg"><img src="./assets/projects/snapdose-light.svg" width="100%" alt="SnapDose: a camera screen scanning a plate, an AI confirmation screen estimating 46 grams of carbs, and a food gallery with a weekly carb chart"></picture></a>
+<a href="https://github.com/cbu-jr-design-26/snap-dose"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/projects/snapdose-dark.svg"><img src="./assets/projects/snapdose-light.svg" width="100%" alt="SnapDose app screens: live glucose, a Gemini carb estimate of 46 grams for a meal photo, the insulin dosing calculator, and the food gallery"></picture></a>
 
 A Type 1 Diabetes app that shows live glucose from Dexcom, estimates carbs from a meal photo with Gemini, calculates the bolus, and sends it to a simulated insulin pump. I built the camera flow and local photo saving, the AI confirmation screen, and the food gallery with its weekly view and meal details. I also tuned the Gemini request and added haptics and loading feedback.
 

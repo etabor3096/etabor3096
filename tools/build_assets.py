@@ -9,12 +9,15 @@ Fonts (both SIL Open Font License, from github.com/google/fonts):
   JetBrains Mono  ofl/jetbrainsmono/JetBrainsMono[wght].ttf
 
 Usage:
-  pip install fonttools uharfbuzz
+  pip install fonttools uharfbuzz pillow
+  sh tools/fetch_screens.sh        # app screenshots, from the project repos
   python tools/build_assets.py --fonts <dir with the two .ttf files>
 """
 
 import argparse
+import base64
 import math
+from io import BytesIO
 from pathlib import Path
 
 import uharfbuzz as hb
@@ -22,6 +25,7 @@ from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "assets"
@@ -249,99 +253,84 @@ def chrome(c, W, H, path, status, status_acc=True):
     return parts
 
 
-# ---------------------------------------------------------------- amphion card
+# ---------------------------------------------------------------- UI showcases
+
+SCREENS = ROOT / "tools" / ".screens"  # filled by tools/fetch_screens.sh
+_embedded = {}
+
+
+def embed(name, width_px):
+    """Downscale a screenshot and return it as a WebP data URI."""
+    key = (name, width_px)
+    if key not in _embedded:
+        im = Image.open(SCREENS / name).convert("RGB")
+        h = round(im.height * width_px / im.width)
+        im = im.resize((width_px, h), Image.LANCZOS)
+        buf = BytesIO()
+        im.save(buf, "WEBP", quality=88, method=6)
+        _embedded[key] = "data:image/webp;base64," + base64.b64encode(buf.getvalue()).decode()
+    return _embedded[key]
+
+
+def showcase(c, slug, path, status, status_acc, screens, aspect, label, legend=None):
+    """A card of phone frames, each holding a real screenshot.
+
+    screens: (file, caption, mine). `mine` gives the frame an amber bezel.
+    """
+    W, pad, gap, bezel = 840, 24, 20, 5
+    n = len(screens)
+    fw = (W - 2 * pad - (n - 1) * gap) / n      # frame width
+    sw = fw - 2 * bezel                          # screen width
+    sh = sw * aspect
+    top = 60
+    fh = sh + 2 * bezel
+    cap_y = top + fh + 26
+    H = round(cap_y + (40 if legend else 22))
+    parts = chrome(c, W, H, path, status, status_acc)
+    for i, (file, caption, mine) in enumerate(screens):
+        fx = pad + i * (fw + gap)
+        sx, sy = fx + bezel, top + bezel
+        cid = f"{slug}{i}"
+        edge = c["acc"] if mine else c["line"]
+        parts.append(f'<rect x="{fmt(fx)}" y="{top}" width="{fmt(fw)}" height="{fmt(fh)}" rx="27" '
+                     f'fill="{c["card2"]}" stroke="{edge}" stroke-width="1.5"/>')
+        parts.append(f'<clipPath id="{cid}"><rect x="{fmt(sx)}" y="{sy}" width="{fmt(sw)}" height="{fmt(sh)}" rx="22"/></clipPath>')
+        parts.append(f'<image href="{embed(file, round(sw * 2))}" x="{fmt(sx)}" y="{sy}" width="{fmt(sw)}" '
+                     f'height="{fmt(sh)}" preserveAspectRatio="xMidYMin slice" clip-path="url(#{cid})"/>')
+        cx = fx + fw / 2
+        col = c["acc"] if mine else c["text"]
+        parts.append(txt(MONO, caption, 11, cx, cap_y, col, "middle"))
+    if legend:
+        parts.append(f'<rect x="{pad}" y="{H - 23}" width="9" height="9" rx="2" fill="{c["acc"]}"/>')
+        parts.append(txt(MONO, legend, 10.5, pad + 16, H - 14.5, c["muted"]))
+    return svg(W, H, label, "\n".join(parts))
+
 
 def amphion(c):
-    W, H = 840, 372
-    parts = chrome(c, W, H, "amphion / tab-playback", "IN PROGRESS")
-    styles = []
+    return showcase(
+        c, "am", "amphion / app screens", "IN PROGRESS", True,
+        [("amphion/08-record.png", "record a song", False),
+         ("amphion/03-library.png", "your library", False),
+         ("amphion/07-song-screen.png", "key, tempo, tuning", False),
+         ("amphion/11-synced-playback.png", "synced tab, flagged notes", False)],
+        1688 / 780,
+        "Amphion app screens: recording a song with the microphone, the song library, a song with its key, tempo "
+        "and tuning, and the guitar tab playing in sync with notes Amphion is unsure about flagged",
+    )
 
-    # Input waveform
-    parts.append(txt(MONO, "INPUT", 10, 18, 62, c["muted"], track=0.8))
-    parts.append(txt(MONO, "mic or file", 10, 238, 62, c["faint"], "end"))
-    for i in range(44):
-        v = abs(math.sin(i * 0.55) * 0.6 + math.sin(i * 1.7 + 1) * 0.3 + math.sin(i * 0.13) * 0.4)
-        h = 6 + v * 34
-        x = 18 + i * 5
-        parts.append(f'<rect class="wv" x="{x}" y="{fmt(103 - h / 2)}" width="3" height="{fmt(h)}" rx="1.5" '
-                     f'fill="{c["acc2"]}" style="animation-delay:-{(i * 0.09) % 1.6:.2f}s"/>')
-    styles.append(".wv{transform-box:fill-box;transform-origin:center;animation:wv 1.6s ease-in-out infinite}"
-                  "@keyframes wv{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.55)}}")
 
-    # Pipeline
-    stages = ["separate stems", "detect notes", "string + fret", "beat grid"]
-    cx0, cw, cg = 272, 122, 20
-    for i, s in enumerate(stages):
-        x = cx0 + i * (cw + cg)
-        parts.append(txt(MONO, f"0{i + 1}", 10, x, 62, c["muted"], track=0.8))
-        parts.append(f'<rect class="st st{i}" x="{x}" y="72" width="{cw}" height="34" rx="7" fill="{c["card2"]}" stroke="{c["line"]}"/>')
-        parts.append(txt(MONO, s, 11, x + cw / 2, 93, c["text"], "middle"))
-        if i < 3:
-            ax = x + cw + 4
-            parts.append(f'<path d="M{ax} 89 H{ax + cg - 8} M{ax + cg - 12} 85 L{ax + cg - 8} 89 L{ax + cg - 12} 93" '
-                         f'stroke="{c["muted"]}" stroke-width="1.3" fill="none"/>')
-    for i in range(4):
-        a = i * 22
-        styles.append(f".st{i}{{animation:st 8s linear infinite;animation-delay:{i * 0.7:.1f}s}}")
-    styles.append(f"@keyframes st{{0%,9%{{stroke:{c['acc']}}}16%,100%{{stroke:{c['line']}}}}}")
-    parts.append(f'<path d="M244 89 H262 M258 85 L262 89 L258 93" stroke="{c["muted"]}" stroke-width="1.3" fill="none"/>')
-
-    # Tab
-    top, gap, x0, x1 = 166, 17, 44, 822
-    for i, s in enumerate("eBGDAE"):
-        y = top + i * gap
-        parts.append(f'<line x1="{x0}" y1="{y}" x2="{x1}" y2="{y}" stroke="{c["faint"]}"/>')
-        parts.append(txt(MONO, s, 10.5, 22, y + 3.8, c["muted"]))
-    bw = (x1 - x0) / 4
-    for k in range(5):
-        bx = x0 + k * bw
-        parts.append(f'<line x1="{fmt(bx)}" y1="{top}" x2="{fmt(bx)}" y2="{top + 5 * gap}" stroke="{c["muted"]}" stroke-width="1.2"/>')
-    chords = [
-        ("G", [(5, "3"), (3, "0"), (2, "0"), (1, "0"), (0, "3"), (1, "0"), (2, "0"), (3, "0")]),
-        ("D", [(4, "0"), (3, "0"), (2, "2"), (0, "2"), (1, "3"), (0, "2"), (2, "2"), (3, "0")]),
-        ("Em", [(5, "0"), (4, "2"), (3, "2"), (2, "0"), (1, "0"), (0, "0"), (1, "0"), (2, "0")]),
-        ("C", [(4, "3"), (3, "2"), (2, "0"), (1, "1"), (0, "0"), (1, "1"), (2, "0"), (3, "2")]),
-    ]
-    period, sweep = 8.0, 6.6
-    span = x1 - x0
-    flagged = (2, 4)
-    for b, (name, notes) in enumerate(chords):
-        bx = x0 + b * bw
-        parts.append(txt(MONO_B, name, 12, bx + 10, top - 14, c["acc2"]))
-        step = bw / 8
-        for n, (si, fret) in enumerate(notes):
-            x = bx + step * (n + 0.5)
-            y = top + si * gap
-            delay = sweep * (x - x0) / span
-            parts.append(f'<rect x="{fmt(x - 6)}" y="{y - 7}" width="12" height="14" fill="{c["card"]}"/>')
-            parts.append(txt(MONO_B, fret, 11.5, x, y + 4.2, c["text"], "middle",
-                             cls="n", extra=f'style="animation-delay:{delay:.2f}s"'))
-            if (b, n) == flagged:
-                parts.append(f'<circle cx="{fmt(x)}" cy="{y}" r="10" fill="none" stroke="{c["acc"]}" stroke-width="1.3" stroke-dasharray="3 2.5"/>')
-                ly0 = top + 5 * gap + 34
-                parts.append(f'<path d="M{fmt(x)} {y + 10} V{ly0 - 4} H{fmt(x + 10)}" stroke="{c["acc"]}" stroke-width="1" stroke-dasharray="2 2" fill="none"/>')
-                parts.append(txt(MONO, "low confidence: flagged so you can check it", 10, x + 14, ly0, c["acc"]))
-    styles.append(f".n{{animation:hit {period}s linear infinite}}"
-                  f"@keyframes hit{{0%,6%{{fill:{c['acc']}}}14%,100%{{fill:{c['text']}}}}}")
-    pct = sweep / period * 100
-    styles.append(f".ph{{animation:sweep {period}s linear infinite}}"
-                  f"@keyframes sweep{{0%{{transform:translateX(0);opacity:1}}{pct:.1f}%{{transform:translateX({span}px);opacity:1}}"
-                  f"{pct + 3:.1f}%,100%{{transform:translateX({span}px);opacity:0}}}}")
-    parts.append(f'<g class="ph motion"><line x1="{x0}" y1="{top - 12}" x2="{x0}" y2="{top + 5 * gap + 12}" '
-                 f'stroke="{c["acc"]}" stroke-width="2"/><circle cx="{x0}" cy="{top - 12}" r="3.5" fill="{c["acc"]}"/></g>')
-
-    # Footer meta
-    y = 336
-    parts.append(f'<line x1="1" y1="{y - 22}" x2="{W - 1}" y2="{y - 22}" stroke="{c["line"]}"/>')
-    x = 18
-    for k, v in [("KEY", "G major"), ("TEMPO", "96 bpm"), ("TUNING", "standard"), ("SPEED", "0.75×"), ("LOOP", "bars 2–3")]:
-        parts.append(txt(MONO, k, 10, x, y + 4, c["muted"], track=0.8))
-        kx = x + MONO.width(k, 10, 0.8) + 8
-        parts.append(txt(MONO_B, v, 11, kx, y + 4, c["text"]))
-        x = kx + MONO_B.width(v, 11) + 26
-    return svg(W, H, "Amphion: audio goes through stem separation, note detection, string and fret mapping, and a beat grid, "
-               "then plays back as a tab with a moving playhead and a flagged low-confidence note",
-               "\n".join(parts), "".join(styles) + REDUCED)
+def snapdose(c):
+    return showcase(
+        c, "sd", "snapdose / app screens", "SHIPPED · SPRING 2026", False,
+        [("snapdose/home.png", "live glucose", False),
+         ("snapdose/results.png", "AI carb estimate", True),
+         ("snapdose/dose.png", "insulin dosing", False),
+         ("snapdose/gallery.png", "food gallery", True)],
+        1000 / 460,
+        "SnapDose app screens: live glucose from Dexcom, a Gemini carb estimate of 46 grams for a meal photo, "
+        "the insulin dosing calculator, and the food gallery with a weekly summary",
+        legend="screens I built",
+    )
 
 
 # ---------------------------------------------------------------- ember card
@@ -438,97 +427,6 @@ def ember(c):
     return svg(W, H, "Ember: a terminal running ember auth login and ember status, next to the ingestion pipeline "
                "with the GitLab connector, the Rust CLI, and the web app's auth and organizations highlighted",
                "\n".join(parts), "".join(styles) + REDUCED)
-
-
-# ---------------------------------------------------------------- snapdose card
-
-def snapdose(c):
-    W, H = 840, 372
-    parts = chrome(c, W, H, "snapdose / meal-to-dose", "SHIPPED · SPRING 2026", status_acc=False)
-    styles = []
-    pw, ph, py = 168, 272, 56
-    xs = [64, 336, 608]
-    screen = c["page"]
-
-    def phone(x, k):
-        return (f'<rect class="ph{k}" x="{x}" y="{py}" width="{pw}" height="{ph}" rx="24" fill="{c["card2"]}" stroke="{c["line"]}" stroke-width="1.5"/>'
-                f'<rect x="{x + 8}" y="{py + 8}" width="{pw - 16}" height="{ph - 16}" rx="17" fill="{screen}"/>'
-                f'<rect x="{x + pw / 2 - 22}" y="{py + 14}" width="44" height="9" rx="4.5" fill="{c["card2"]}"/>')
-
-    for k in range(3):
-        styles.append(f".ph{k}{{animation:pk 9s linear infinite;animation-delay:{k * 3}s}}")
-    styles.append(f"@keyframes pk{{0%,30%{{stroke:{c['acc']}}}34%,100%{{stroke:{c['line']}}}}}")
-
-    # 1. Camera
-    x = xs[0]
-    parts.append(phone(x, 0))
-    cx, cy = x + pw / 2, py + 120
-    parts.append(txt(MONO_B, "SNAP", 10, cx, py + 46, c["muted"], "middle", 1.0))
-    for sx, sy, dx, dy in [(-58, -58, 1, 1), (58, -58, -1, 1), (-58, 58, 1, -1), (58, 58, -1, -1)]:
-        ax, ay = cx + sx, cy + sy
-        parts.append(f'<path d="M{fmt(ax)} {fmt(ay + 14 * dy)} V{fmt(ay)} H{fmt(ax + 14 * dx)}" stroke="{c["acc"]}" stroke-width="2" fill="none" stroke-linecap="round"/>')
-    parts.append(f'<circle cx="{fmt(cx)}" cy="{cy}" r="42" fill="{c["card2"]}" stroke="{c["faint"]}" stroke-width="1.5"/>')
-    parts.append(f'<ellipse cx="{fmt(cx - 10)}" cy="{cy - 8}" rx="20" ry="11" fill="#e8835a" transform="rotate(-18 {fmt(cx - 10)} {cy - 8})"/>')
-    for i in range(14):
-        a = i * 0.9
-        r = 8 + (i % 4) * 3
-        parts.append(f'<circle cx="{fmt(cx + 12 + math.cos(a) * r)}" cy="{fmt(cy + 14 + math.sin(a) * r * 0.6)}" r="2.6" fill="#d9c08a"/>')
-    for i in range(4):
-        parts.append(f'<ellipse cx="{fmt(cx - 22 + i * 7)}" cy="{cy + 20 + (i % 2) * 4}" rx="6" ry="3.4" fill="{c["acc2"]}"/>')
-    parts.append(f'<g class="scan motion"><line x1="{fmt(cx - 56)}" y1="{cy - 50}" x2="{fmt(cx + 56)}" y2="{cy - 50}" stroke="{c["acc"]}" stroke-width="1.6"/></g>')
-    styles.append(".scan{animation:scan 2.6s ease-in-out infinite alternate}@keyframes scan{from{transform:translateY(0)}to{transform:translateY(100px)}}")
-    parts.append(f'<circle cx="{fmt(cx)}" cy="{py + ph - 44}" r="17" fill="none" stroke="{c["text"]}" stroke-width="2"/>')
-    parts.append(f'<circle cx="{fmt(cx)}" cy="{py + ph - 44}" r="12" fill="{c["text"]}"/>')
-
-    # 2. AI confirmation
-    x = xs[1]
-    parts.append(phone(x, 1))
-    cx = x + pw / 2
-    parts.append(txt(MONO_B, "CONFIRM", 10, cx, py + 46, c["muted"], "middle", 1.0))
-    parts.append(txt(DISPLAY, "46 g", 40, cx, py + 98, c["text"], "middle", -0.5))
-    parts.append(txt(MONO, "carbs", 10, cx, py + 116, c["muted"], "middle"))
-    parts.append(f'<rect x="{fmt(cx - 46)}" y="{py + 124}" width="92" height="18" rx="9" fill="none" stroke="{c["acc2"]}"/>')
-    parts.append(txt(MONO_B, "HIGH CONFIDENCE", 8, cx, py + 136, c["acc2"], "middle", 0.4))
-    for i, (f, g) in enumerate([("salmon", "0 g"), ("quinoa", "39 g"), ("greens", "7 g")]):
-        yy = py + 164 + i * 22
-        parts.append(txt(MONO, f, 10.5, x + 22, yy, c["text"]))
-        parts.append(txt(MONO, g, 10.5, x + pw - 22, yy, c["muted"], "end"))
-        parts.append(f'<line x1="{x + 22}" y1="{yy + 7}" x2="{x + pw - 22}" y2="{yy + 7}" stroke="{c["line"]}"/>')
-    parts.append(f'<rect x="{x + 20}" y="{py + ph - 58}" width="{pw - 40}" height="28" rx="8" fill="{c["acc"]}"/>')
-    parts.append(txt(MONO_B, "USE 46 G", 10.5, cx, py + ph - 40, c["onacc"], "middle", 0.8))
-
-    # 3. Food gallery
-    x = xs[2]
-    parts.append(phone(x, 2))
-    cx = x + pw / 2
-    parts.append(txt(MONO_B, "THIS WEEK", 10, cx, py + 46, c["muted"], "middle", 1.0))
-    vals = [0.55, 0.8, 0.45, 0.7, 0.95, 0.6, 0.35]
-    for i, v in enumerate(vals):
-        bx = x + 22 + i * 18
-        h = 46 * v
-        today = i == 4
-        parts.append(f'<rect x="{bx}" y="{fmt(py + 112 - h)}" width="11" height="{fmt(h)}" rx="3" fill="{c["acc"] if today else c["faint"]}"/>')
-        parts.append(txt(MONO, "MTWTFSS"[i], 8.5, bx + 5.5, py + 126, c["acc"] if today else c["muted"], "middle"))
-    tiles = [("46g", "#e8835a"), ("32g", "#d9c08a"), ("58g", c["acc2"]), ("21g", "#c79bd8")]
-    for i, (lab, col) in enumerate(tiles):
-        tx_ = x + 20 + (i % 2) * 66
-        ty_ = py + 140 + (i // 2) * 58
-        parts.append(f'<rect x="{tx_}" y="{ty_}" width="62" height="52" rx="8" fill="{c["card2"]}"/>')
-        parts.append(f'<circle cx="{tx_ + 20}" cy="{ty_ + 22}" r="11" fill="{col}" opacity=".85"/>')
-        parts.append(txt(MONO_B, lab, 9.5, tx_ + 54, ty_ + 45, c["text"], "end"))
-
-    # Arrows + labels between phones
-    for i, lab in enumerate(["Gemini", "dose"]):
-        ax = xs[i] + pw + 14
-        bx = xs[i + 1] - 14
-        my = py + ph / 2
-        parts.append(f'<path d="M{ax} {my} H{bx} M{bx - 6} {my - 5} L{bx} {my} L{bx - 6} {my + 5}" stroke="{c["muted"]}" stroke-width="1.4" fill="none"/>')
-        parts.append(txt(MONO, lab, 10.5, (ax + bx) / 2, my - 10, c["muted"], "middle"))
-
-    for k, cap in enumerate(["camera + local save", "AI confirmation screen", "gallery + weekly view"]):
-        parts.append(txt(MONO, cap, 10.5, xs[k] + pw / 2, py + ph + 26, c["text"], "middle"))
-    return svg(W, H, "SnapDose: a camera screen scanning a plate, an AI confirmation screen estimating 46 grams of carbs, "
-               "and a food gallery with a weekly carb chart", "\n".join(parts), "".join(styles) + REDUCED)
 
 
 # ---------------------------------------------------------------- footer
