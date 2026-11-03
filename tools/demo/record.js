@@ -9,6 +9,13 @@ const path = require('path');
 const BASE = 'http://localhost:5180/';
 const [, , OUT, SCHEME = 'light', ...ONLY] = process.argv;
 
+// The demo gives a recorded song one of two sample tabs, chosen by its id
+// (Date.now()) being even or odd. Even ids get the G major one, so make the
+// clock even: every step of the journey then shows the same tab.
+const SAME_TAB = `
+{ const now = Date.now; Date.now = () => { const t = now.call(Date); return t - (t % 2); }; }
+`;
+
 // Draws a soft circle wherever the "finger" taps, so viewers can follow along.
 const TOUCHES = `
 addEventListener('pointerdown', e => {
@@ -31,9 +38,9 @@ async function tap(locator, pause = 700) {
   await wait(pause);
 }
 
-async function slowType(locator, text) {
+async function slowType(locator, text, gap = 70) {
   await locator.click();
-  for (const ch of text) { await locator.press(ch === ' ' ? 'Space' : ch); await wait(70); }
+  for (const ch of text) { await locator.press(ch === ' ' ? 'Space' : ch); await wait(gap); }
 }
 
 async function smoothScroll(app, dy, ms = 900) {
@@ -45,61 +52,89 @@ async function smoothScroll(app, dy, ms = 900) {
   }), [dy, ms]);
 }
 
-// Each clip: setup() runs off camera, then run() is recorded for exactly LEN ms.
-const LEN = 12000;
+// The demo is one journey with one song: record it, wait for its tab, play
+// along, then practice. Each clip is one step, and each starts where the last
+// one ended. setup() runs off camera; run() is recorded for exactly `len` ms.
+// Keep the names and lengths in step with AMPHION_CLIPS in build_assets.py.
 const btn = (app, name) => app.getByRole('button', { name, exact: false }).first();
+const SONG = 'Evening Practice';
+const PROCESSING = 8000; // PROCESSING_MS in the demo's MainApp.tsx
+
+// Record a song and ask for its tab, off camera. Returns when the tab was requested.
+async function makeSong(app) {
+  await btn(app, 'Add Song').click();
+  await btn(app, 'Record with Mic').click();
+  await btn(app, 'Allow Microphone').click();
+  await wait(1200);
+  await btn(app, 'Stop recording').click();
+  await app.getByPlaceholder('e.g., Sunday morning idea').fill(SONG);
+  await btn(app, 'Make Tab').click();
+  const requested = Date.now();
+  await btn(app, 'Maybe later').click();
+  await app.getByRole('button', { name: `More actions for ${SONG}` }).waitFor();
+  return requested;
+}
+
+async function openSongWhenReady(app, requested) {
+  await wait(Math.max(0, requested + PROCESSING + 600 - Date.now()));
+  await app.getByRole('button', { name: `Open ${SONG} tab` }).click();
+  // Let the "Your tab is ready" toast finish; the previous step already showed it.
+  await app.getByText(/is ready/).first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+  await wait(500);
+}
 
 const CLIPS = {
   record: {
+    len: 8000,
     async setup(app) {},
     async run(app) {
-      await wait(500);
-      await tap(btn(app, 'Add Song'), 900);
-      await tap(btn(app, 'Record with Mic'), 900);
-      await tap(btn(app, 'Allow Microphone'), 2200);
-      await tap(btn(app, 'Stop recording'), 900);
-      await slowType(app.getByPlaceholder('e.g., Sunday morning idea'), 'Evening Practice');
       await wait(400);
-      await tap(btn(app, 'Make Tab'), 1100);
-      await tap(btn(app, 'Maybe later'), 400);
+      await tap(btn(app, 'Add Song'), 700);
+      await tap(btn(app, 'Record with Mic'), 700);
+      await tap(btn(app, 'Allow Microphone'), 1700);
+      await tap(btn(app, 'Stop recording'), 600);
+      await slowType(app.getByPlaceholder('e.g., Sunday morning idea'), SONG, 45);
+      await wait(250);
+      await tap(btn(app, 'Make Tab'), 900);
+      await tap(btn(app, 'Maybe later'), 300);
     },
   },
-  playback: {
-    async setup(app) {},
+  ready: {
+    len: 6000,
+    async setup(app) {
+      const requested = await makeSong(app);
+      // Start filming 2.5 s before the tab is ready.
+      await wait(Math.max(0, requested + PROCESSING - 2500 - Date.now()));
+    },
     async run(app) {
-      await wait(500);
-      await tap(app.getByRole('button', { name: 'Open Back Porch Chorus tab' }), 1300);
-      await tap(app.getByRole('button', { name: 'Play song', exact: true }).first(), 400);
+      await wait(3600); // the card turns Ready and the toast appears
+      await tap(app.getByRole('button', { name: `Open ${SONG} tab` }), 300);
+    },
+  },
+  play: {
+    len: 6500,
+    async setup(app) {
+      await openSongWhenReady(app, await makeSong(app));
+    },
+    async run(app) {
+      await wait(700);
+      await tap(app.getByRole('button', { name: 'Play song', exact: true }).first(), 300);
     },
   },
   practice: {
+    len: 7500,
     async setup(app) {
-      await tap(app.getByRole('button', { name: 'Open Back Porch Chorus tab' }), 900);
+      await openSongWhenReady(app, await makeSong(app));
       await smoothScroll(app, 640, 10);
       await wait(400);
     },
     async run(app) {
       await wait(500);
-      await tap(app.getByRole('button', { name: /^Speed/ }).last(), 900);
-      await tap(app.getByText('75%', { exact: true }).last(), 700);
-      await tap(app.getByRole('button', { name: 'Play song', exact: true }).last(), 2200);
-      await tap(app.getByRole('button', { name: /loop start/i }).last(), 2600);
+      await tap(app.getByRole('button', { name: /^Speed/ }).last(), 800);
+      await tap(app.getByText('75%', { exact: true }).last(), 600);
+      await tap(app.getByRole('button', { name: 'Play song', exact: true }).last(), 1900);
+      await tap(app.getByRole('button', { name: /loop start/i }).last(), 2300);
       await tap(app.getByRole('button', { name: /loop end/i }).last(), 300);
-    },
-  },
-  chords: {
-    async setup(app) {
-      await tap(app.getByRole('button', { name: 'Open Back Porch Chorus tab' }), 900);
-      await smoothScroll(app, 640, 10);
-      await wait(400);
-    },
-    async run(app) {
-      await wait(600);
-      await tap(app.getByRole('button', { name: /Chord G\. Show finger diagram/ }).first(), 2000);
-      await app.keyboard?.press?.('Escape');
-      await tap(app.getByRole('button', { name: /Close|Dismiss/i }).last().or(app.getByRole('button', { name: '×' }).last()), 700).catch(() => {});
-      await tap(app.getByRole('button', { name: /^Chords$/ }).first(), 2200);
-      await tap(app.getByRole('button', { name: /^Bass/ }).first(), 1800);
     },
   },
 };
@@ -109,6 +144,7 @@ async function main() {
   for (const [name, clip] of Object.entries(CLIPS)) {
     if (ONLY.length && !ONLY.includes(name)) continue;
     const ctx = await browser.newContext({ viewport: { width: 700, height: 1000 }, deviceScaleFactor: 2, colorScheme: SCHEME });
+    await ctx.addInitScript(SAME_TAB);
     await ctx.addInitScript(TOUCHES);
     const page = await ctx.newPage();
     await page.goto(BASE);
@@ -134,7 +170,7 @@ async function main() {
     await cdp.send('Page.startScreencast', { format: 'png', everyNthFrame: 1, maxWidth: 1400, maxHeight: 2000 });
     const start = Date.now() / 1000;
     await clip.run(app).catch(e => console.error(name, 'flow error:', e.message.split('\n').slice(0,4).join(' | ')));
-    const left = LEN - (Date.now() / 1000 - start) * 1000;
+    const left = clip.len - (Date.now() / 1000 - start) * 1000;
     if (left > 0) await wait(left); else console.warn(name, 'ran long by', -left, 'ms');
     const end = Date.now() / 1000;
     await cdp.send('Page.stopScreencast');

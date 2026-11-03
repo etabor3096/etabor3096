@@ -26,7 +26,7 @@ Computer science student who likes building the whole thing: the webhook that pu
 
 **Songs in, playable guitar and bass tabs out.** · Oct 2026 – now
 
-<a href="https://github.com/etabor3096/Amphion"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/projects/amphion-dark.webp"><img src="./assets/projects/amphion-light.webp" width="100%" alt="Amphion demo: recording a song and making a tab, the tab playing in sync with the song, slowing it down and looping two bars, and chord diagrams and the bass part"></picture></a>
+<a href="https://github.com/etabor3096/Amphion"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/projects/amphion-dark.webp"><img src="./assets/projects/amphion-light.webp" width="100%" alt="Amphion demo, one song from start to finish: record it and ask for a tab, the tab turns ready and opens, it plays in sync with the song, then slow it down and loop two bars"></picture></a>
 
 Beginners learn guitar by playing songs they love, but plenty of songs have no tabs, and the ones that exist are often wrong. Amphion listens to a recording or an uploaded file, separates the guitar and bass from the mix, detects the notes, puts each one on a string and fret, and locks them to the song's beat grid. The tab scrolls with the audio while you play along. You can slow it down, loop a hard section, or tap a note to jump to it, and notes the model isn't sure about are flagged instead of hidden.
 

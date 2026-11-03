@@ -3,7 +3,8 @@
 Each card is the usual project card drawn by build_assets.py, with four phone
 screens left empty. This script fills the screens frame by frame:
 
-  amphion   plays four recordings of the Amphion front-end demo (record.js)
+  amphion   plays the four steps of one journey through the Amphion front-end
+            demo (record.js), one phone at a time
   snapdose  animates a walkthrough over the real SnapDose screenshots. The app
             needs its Firebase backend to run, so this one is not a recording.
 
@@ -30,12 +31,32 @@ import build_assets as ba  # noqa: E402
 WORK = ROOT / "tools" / ".demo"
 SCALE = 2      # output pixels per CSS pixel, for sharp text on retina screens
 FPS = 12
-LENGTH = 12.0  # seconds per loop; record.js records exactly this long
 
 
 def ease(k):
     k = max(0.0, min(1.0, k))
     return k * k * (3 - 2 * k)
+
+
+def spotlight(i, t, phases):
+    """1 while phone i is in its step, 0 otherwise, with short fades between."""
+    a, b = phases[i]
+    end = phases[-1][1]
+    if i == 0 and t > end - 0.3:   # hand back to the first phone as the loop restarts
+        return ease((t - end + 0.3) / 0.3)
+    return ease((t - a) / 0.3) * (1 - ease((t - b + 0.3) / 0.3))
+
+
+def dim_color(theme):
+    return (13, 17, 23) if theme == "dark" else (246, 248, 250)
+
+
+def phases_from(lengths):
+    out, t = [], 0.0
+    for n in lengths:
+        out.append((t, t + n))
+        t += n
+    return out
 
 
 # ---------------------------------------------------------------- amphion
@@ -64,8 +85,28 @@ class Clip:
         return self._cache[i]
 
 
+AMPHION_PHASES = phases_from([n for _, _, n in ba.AMPHION_CLIPS])
+
+
+class Step:
+    """One phone in the Amphion journey: plays its clip during its step, and
+    holds the clip's first or last frame, dimmed, the rest of the loop."""
+
+    def __init__(self, index, clip, theme):
+        self.i, self.clip, self.dim = index, clip, dim_color(theme)
+
+    def __call__(self, t):
+        a, b = AMPHION_PHASES[self.i]
+        im = self.clip(min(max(t - a, 0.0), b - a - 0.01))
+        on = spotlight(self.i, t, AMPHION_PHASES)
+        if on < 1:
+            im = Image.blend(im, Image.new("RGB", im.size, self.dim), 0.55 * (1 - on))
+        return im
+
+
 def amphion_screens(theme, c, sizes):
-    return [Clip(WORK / "clips" / theme / name, size) for (name, _), size in zip(ba.AMPHION_CLIPS, sizes)]
+    return [Step(i, Clip(WORK / "clips" / theme / name, size), theme)
+            for i, ((name, _, _), size) in enumerate(zip(ba.AMPHION_CLIPS, sizes))]
 
 
 # ---------------------------------------------------------------- snapdose
@@ -109,20 +150,14 @@ class Walkthrough:
         self.i, self.name, self.size = index, name, size
         self.shot = Image.open(SHOTS / f"{name}.png").convert("RGB")
         self.camera = camera_view(self.shot) if name == "results" else None
-        self.dim = (13, 17, 23) if theme == "dark" else (246, 248, 250)
-
-    def spotlight(self, t):
-        a, b = PHASES[self.i]
-        if self.i == 0 and t > 11.7:   # hand back to the first phone as the loop restarts
-            return ease((t - 11.7) / 0.3)
-        return ease((t - a) / 0.3) * (1 - ease((t - b + 0.3) / 0.3))
+        self.dim = dim_color(theme)
 
     def __call__(self, t):
         a, _ = PHASES[self.i]
         im = self.camera if (self.camera and a <= t < SHUTTER) else self.shot
         im = im.copy()
         w, h = im.size
-        on = self.spotlight(t)
+        on = spotlight(self.i, t, PHASES)
         if on > 0:  # slow push-in while in the spotlight
             z = 1 + 0.03 * ease((t - a) / 3)
             cw, ch = w / z, h / z
@@ -147,9 +182,9 @@ def snapdose_screens(theme, c, sizes):
 
 # ---------------------------------------------------------------- shared
 
-CARDS = {
-    "amphion": (ba.amphion_frame, amphion_screens),
-    "snapdose": (ba.snapdose_frame, snapdose_screens),
+CARDS = {  # frame, screens, loop length in seconds
+    "amphion": (ba.amphion_frame, amphion_screens, AMPHION_PHASES[-1][1]),
+    "snapdose": (ba.snapdose_frame, snapdose_screens, PHASES[-1][1]),
 }
 
 
@@ -160,7 +195,7 @@ def rounded_mask(size, radius):
 
 
 def build(card, theme, c):
-    frame_fn, screens_fn = CARDS[card]
+    frame_fn, screens_fn, length = CARDS[card]
     slots = []
     svg = frame_fn(c, slots)
     WORK.mkdir(parents=True, exist_ok=True)
@@ -175,7 +210,7 @@ def build(card, theme, c):
               for screen, s, size in zip(screens, slots, sizes)]
 
     frames = []
-    for k in range(int(LENGTH * FPS)):
+    for k in range(round(length * FPS)):
         t = k / FPS
         frame = background.copy()
         for screen, pos, mask in placed:
@@ -206,7 +241,7 @@ def main():
 
 def preview(card, theme, c, times):
     """Quick check: a strip of single frames, without encoding the animation."""
-    frame_fn, screens_fn = CARDS[card]
+    frame_fn, screens_fn, _ = CARDS[card]
     slots = []
     frame_fn(c, slots)
     sizes = [(round(s["w"]), round(s["h"])) for s in slots]

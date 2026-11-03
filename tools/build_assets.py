@@ -311,12 +311,13 @@ def showcase(c, slug, path, status, status_acc, screens, aspect, label, legend=N
     return svg(W, H, label, "\n".join(parts))
 
 
-# The four Amphion demo recordings, in card order. tools/demo/record.js makes them.
+# The Amphion demo is one journey with one song, recorded step by step by
+# tools/demo/record.js: (clip name, caption, seconds). The phones play in turn.
 AMPHION_CLIPS = [
-    ("record", "record → make tab"),
-    ("playback", "synced tab playback"),
-    ("practice", "slow down + A-B loop"),
-    ("chords", "chords + bass"),
+    ("record", "1  record a song", 8.0),
+    ("ready", "2  tab ready → open it", 6.0),
+    ("play", "3  play along in sync", 6.5),
+    ("practice", "4  slow down + loop", 7.5),
 ]
 
 
@@ -324,7 +325,7 @@ def amphion_frame(c, slots):
     """The Amphion card with empty screens; compose.py plays the clips in them."""
     return showcase(
         c, "am", "amphion / live demo", "IN PROGRESS", True,
-        [(None, cap, False) for _, cap in AMPHION_CLIPS],
+        [(None, cap, False) for _, cap, _ in AMPHION_CLIPS],
         844 / 390,
         "Amphion demo",
         slots=slots,
@@ -345,7 +346,7 @@ def snapdose_frame(c, slots):
     """The SnapDose card with empty screens; compose.py animates them."""
     return showcase(
         c, "sd", "snapdose / walkthrough", "SHIPPED · SPRING 2026", False,
-        [(None, cap, mine) for _, cap, mine in SNAPDOSE_SCREENS],
+        [(None, f"{i + 1}  {cap}", mine) for i, (_, cap, mine) in enumerate(SNAPDOSE_SCREENS)],
         1000 / 460,
         "SnapDose walkthrough",
         legend="screens I built",
