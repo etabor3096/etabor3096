@@ -7,9 +7,9 @@
 
 Computer science student who likes building the whole thing: the webhook that pulls the data in, the CLI and auth around it, and the app someone actually holds. Lately that means AI tools for developers and an app that teaches guitar.
 
-**Studying** &nbsp; Computer Science · California Baptist University<br>
-**Building** &nbsp; Amphion, an iOS app that turns songs into guitar and bass tabs<br>
-**Capstone** &nbsp; Ember, shared project context for AI coding agents
+**Studying:** &nbsp; Computer Science · California Baptist University<br>
+**Building:** &nbsp; Amphion, an iOS app that turns songs into guitar and bass tabs<br>
+**Capstone:** &nbsp; Ember, shared project context for AI coding agents
 
 <a href="https://github.com/etabor3096/Amphion"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/buttons/amphion-dark.svg"><img src="./assets/buttons/amphion-light.svg" alt="Amphion"></picture></a>
 <a href="https://github.com/cbu-capstone-design-27/ember"><picture><source media="(prefers-color-scheme: dark)" srcset="./assets/buttons/ember-dark.svg"><img src="./assets/buttons/ember-light.svg" alt="Ember"></picture></a>
@@ -66,10 +66,10 @@ A Type 1 Diabetes app that shows live glucose from Dexcom, estimates carbs from 
   <img src="./assets/headings/toolbox-light.svg" width="100%" alt="03 Toolbox">
 </picture>
 
-**Languages** &nbsp; `TypeScript` `Python` `Rust` `Java` `JavaScript` `C++`<br>
-**Frameworks** &nbsp; `Next.js` `React Native` `Expo` `Spring Boot`<br>
-**Data and AI** &nbsp; `PostgreSQL` `pgvector` `Firebase` `Gemini API` `MCP`<br>
-**Workflow** &nbsp; `Git` `GitHub` `Docker` `Jira`
+**Languages:** &nbsp; `TypeScript` `Python` `Rust` `Java` `JavaScript` `C++`<br>
+**Frameworks:** &nbsp; `Next.js` `React Native` `Expo` `Spring Boot`<br>
+**Data and AI:** &nbsp; `PostgreSQL` `pgvector` `Firebase` `Gemini API` `MCP`<br>
+**Workflow:** &nbsp; `Git` `GitHub` `Docker` `Jira`
 
 <br>
 
