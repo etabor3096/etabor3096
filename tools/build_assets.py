@@ -358,7 +358,7 @@ def snapdose_frame(c, slots):
 
 def ember(c):
     W, H = 840, 388
-    parts = chrome(c, W, H, "ember / ingestion + cli", "CAPSTONE · 2026–27")
+    parts = chrome(c, W, H, "ember / ingestion + cli", "IN PROGRESS · CAPSTONE 2026–27")
     styles = []
 
     # Terminal
