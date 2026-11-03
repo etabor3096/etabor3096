@@ -272,10 +272,12 @@ def embed(name, width_px):
     return _embedded[key]
 
 
-def showcase(c, slug, path, status, status_acc, screens, aspect, label, legend=None):
+def showcase(c, slug, path, status, status_acc, screens, aspect, label, legend=None, slots=None):
     """A card of phone frames, each holding a real screenshot.
 
     screens: (file, caption, mine). `mine` gives the frame an amber bezel.
+    A file of None leaves the screen empty for tools/demo/compose.py to fill
+    with a recording; pass a list as `slots` to get each screen's rect back.
     """
     W, pad, gap, bezel = 840, 24, 20, 5
     n = len(screens)
@@ -295,8 +297,11 @@ def showcase(c, slug, path, status, status_acc, screens, aspect, label, legend=N
         parts.append(f'<rect x="{fmt(fx)}" y="{top}" width="{fmt(fw)}" height="{fmt(fh)}" rx="27" '
                      f'fill="{c["card2"]}" stroke="{edge}" stroke-width="1.5"/>')
         parts.append(f'<clipPath id="{cid}"><rect x="{fmt(sx)}" y="{sy}" width="{fmt(sw)}" height="{fmt(sh)}" rx="22"/></clipPath>')
-        parts.append(f'<image href="{embed(file, round(sw * 2))}" x="{fmt(sx)}" y="{sy}" width="{fmt(sw)}" '
-                     f'height="{fmt(sh)}" preserveAspectRatio="xMidYMin slice" clip-path="url(#{cid})"/>')
+        if file:
+            parts.append(f'<image href="{embed(file, round(sw * 2))}" x="{fmt(sx)}" y="{sy}" width="{fmt(sw)}" '
+                         f'height="{fmt(sh)}" preserveAspectRatio="xMidYMin slice" clip-path="url(#{cid})"/>')
+        if slots is not None:
+            slots.append(dict(x=sx, y=sy, w=sw, h=sh, r=22))
         cx = fx + fw / 2
         col = c["acc"] if mine else c["text"]
         parts.append(txt(MONO, caption, 11, cx, cap_y, col, "middle"))
@@ -306,30 +311,45 @@ def showcase(c, slug, path, status, status_acc, screens, aspect, label, legend=N
     return svg(W, H, label, "\n".join(parts))
 
 
-def amphion(c):
+# The four Amphion demo recordings, in card order. tools/demo/record.js makes them.
+AMPHION_CLIPS = [
+    ("record", "record → make tab"),
+    ("playback", "synced tab playback"),
+    ("practice", "slow down + A-B loop"),
+    ("chords", "chords + bass"),
+]
+
+
+def amphion_frame(c, slots):
+    """The Amphion card with empty screens; compose.py plays the clips in them."""
     return showcase(
-        c, "am", "amphion / app screens", "IN PROGRESS", True,
-        [("amphion/08-record.png", "record a song", False),
-         ("amphion/03-library.png", "your library", False),
-         ("amphion/07-song-screen.png", "key, tempo, tuning", False),
-         ("amphion/11-synced-playback.png", "synced tab, flagged notes", False)],
-        1688 / 780,
-        "Amphion app screens: recording a song with the microphone, the song library, a song with its key, tempo "
-        "and tuning, and the guitar tab playing in sync with notes Amphion is unsure about flagged",
+        c, "am", "amphion / live demo", "IN PROGRESS", True,
+        [(None, cap, False) for _, cap in AMPHION_CLIPS],
+        844 / 390,
+        "Amphion demo",
+        slots=slots,
     )
 
 
-def snapdose(c):
+# SnapDose needs its Firebase backend to run, so its card is a walkthrough
+# animated from the real screenshots (tools/demo/compose.py), not a recording.
+SNAPDOSE_SCREENS = [
+    ("home", "live glucose", False),
+    ("results", "snap → AI carb estimate", True),
+    ("dose", "insulin dosing", False),
+    ("gallery", "food gallery", True),
+]
+
+
+def snapdose_frame(c, slots):
+    """The SnapDose card with empty screens; compose.py animates them."""
     return showcase(
-        c, "sd", "snapdose / app screens", "SHIPPED · SPRING 2026", False,
-        [("snapdose/home.png", "live glucose", False),
-         ("snapdose/results.png", "AI carb estimate", True),
-         ("snapdose/dose.png", "insulin dosing", False),
-         ("snapdose/gallery.png", "food gallery", True)],
+        c, "sd", "snapdose / walkthrough", "SHIPPED · SPRING 2026", False,
+        [(None, cap, mine) for _, cap, mine in SNAPDOSE_SCREENS],
         1000 / 460,
-        "SnapDose app screens: live glucose from Dexcom, a Gemini carb estimate of 46 grams for a meal photo, "
-        "the insulin dosing calculator, and the food gallery with a weekly summary",
+        "SnapDose walkthrough",
         legend="screens I built",
+        slots=slots,
     )
 
 
@@ -455,9 +475,7 @@ def main():
     load_fonts(args.fonts)
     for theme, c in PALETTES.items():
         write("header", theme, header(c))
-        write("projects/amphion", theme, amphion(c))
         write("projects/ember", theme, ember(c))
-        write("projects/snapdose", theme, snapdose(c))
         write("footer", theme, footer(c))
         for slug, idx, title in [("now", "01", "Now building"), ("projects", "02", "Team projects"), ("toolbox", "03", "Toolbox")]:
             write(f"headings/{slug}", theme, heading(c, idx, title))

@@ -2,3 +2,5 @@ __pycache__/
 _preview*.html
 _cards.html
 tools/.screens/
+node_modules/
+tools/.demo/

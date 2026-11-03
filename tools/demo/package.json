@@ -1,0 +1,8 @@
+{
+  "name": "profile-demo-tools",
+  "private": true,
+  "description": "Records the Amphion demo and renders the card frame. See compose.py.",
+  "dependencies": {
+    "playwright": "^1.56.0"
+  }
+}
